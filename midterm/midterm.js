@@ -5,26 +5,37 @@ let fwd, bwd;
 let mvx, mvy, mvmag;
 let speed;
 let figpos, figsz;
+let figframe, blink;
 let step;
 let stl, str;
 let stcount;
 let light1, light2, light3, light4;
 let lightpos;
+let thrdltpos;
 let lightdist = [280, 170, 100, 60];
+let thrdltdist = [490, 420, 350, 280];
 let lightlist = [];
+let thrdlist = [];
 let lightmove = [];
 let lightspeed;
+let lightcode = [];
 let shake;
 let shkx = [];
 let shky = [];
 let filter;
 let cnt;
 let sumx, sumy;
+let first;
+let hlheight, hllength;
+let thrdfigpos;
+let selfpos;
+let hallpos;
+let selfblink, selfframe;
 
 function setup(){
   createCanvas(800,800);
   noStroke();
-  rectMode(CENTER);
+  //rectMode(CENTER);
   wlx = 375; //wall cords and movement
   wly = 375*tan((44.5/180)*PI);
   mvx = 50;
@@ -40,13 +51,17 @@ function setup(){
   bwd = false;
   figpos = createVector(400,400); //figure
   figsz = 1;
+  blink = true;
+  selfblink = true;
   stl = true; //walking effect
   str = false;
   stcount = 0;
   lightpos = createVector(400,400); //light
+  lightcode = [0, 1, 2, 3];
+  onoff = [false, false, false, false];
   
   for(let i = 0; i < 4; i++){
-    lightlist[i] = new light(0, lightdist[i], lightpos);
+    lightlist[i] = new light(0, lightdist[i], lightpos, lightcode[i]);
     //light1 = new light(0, 280, lightpos);
     //light2 = new light(0, 170, lightpos);
     //light3 = new light(0, 100, lightpos);
@@ -87,11 +102,23 @@ function setup(){
     sumy += shky[cnt];
   }
   //print(sumy);
-  filter = 0.07;
+
+  filter = 0.07; //panic effect
+  first = true; //camera
+
+  hlheight = 126; //hall
+  hllength = sqrt(abs(pow(wl11.x, 2) + pow(wl11.y, 2)))/cos(44.5);
+  thrdltpos = createVector(hllength, 400-hlheight/2); //thrd lights
+  for(let i = 0; i < 4; i++){
+    thrdlist[i] = new thrdlight(thrdltdist[i], 0, thrdltpos, lightcode[i]);
+  }
+
+  thrdfigpos = createVector(hllength-18,400-hlheight/2+30); //thrd figures
+  selfpos = createVector(25,800-(337+hlheight/2));
 }
 
 function wall(upl,downl,upr,downr){ //draw wall
-  fill(105);
+  fill(10 + countlights(onoff)*5);
   beginShape();
   vertex(0,0);
   vertex(upl.x, upl.y);
@@ -107,7 +134,7 @@ function wall(upl,downl,upr,downr){ //draw wall
 }
 
 function ground(upl,upr,downl,downr){ //draw ground and ceiling
-  fill(128);
+  fill(20 + countlights(onoff)*5);
   beginShape();
   vertex(0,0);
   vertex(upl.x, upl.y);
@@ -129,6 +156,12 @@ function keyPressed(){
   else if(key == 's'){
     bwd = true;
   }
+  if(key == 'c' && first == false){
+    first = true;
+  }
+  else if(key == 'c' && first == true){
+    first = false;
+  }
 }
 
 function keyReleased(){
@@ -147,7 +180,7 @@ function figure(x,y,size){ //draw figure
   fill(0);
   ellipse(-6.5*size,-20*size,2.5*size,8*size); //ear
   ellipse(1.1*size,-20*size,2*size,8*size);
-  fill(80);
+  fill(0 + countlights(onoff)*5);
   rect(-6.5*size,-22*size,3*size,4*size);
   rect(1.1*size,-22*size,3*size,5*size);
 
@@ -188,6 +221,19 @@ function figure(x,y,size){ //draw figure
   rect(0,-3.5*size,(50/14)*size,0.65*size); //doubler
   rect(0,-2.9*size,0.65*size,(800-2*wly)/14*size);
 
+  if(frameCount%100 == 0){
+    if(blink == true){
+      figframe = frameCount;
+      blink = false;
+    }
+  }
+  if(frameCount - figframe <= 10){
+    fill(0);
+  }
+  else{
+    fill(255);
+    blink = true;
+  }
   circle(-2.8*size,-18*size,1.5*size); //eyes
   circle(1*size,-17.8*size,1.5*size);
   
@@ -203,6 +249,10 @@ function mouseMoved(){
   pop();
 }
 */
+
+//function mouseMoved(){ 
+  //print(mouseX-25, mouseY-400);
+//}
 
 function walk(stepsize){ //walking effect
   step = createVector(stepsize,stepsize);
@@ -293,99 +343,299 @@ function walk(stepsize){ //walking effect
 }
 
 function sanity(sx, sy){ //shaking and red filter effect
-  if(frameCount % 5 == 0){
-    if(cnt < shkx.length){
-      shake.x = shkx[cnt];
-      shake.y = shky[cnt];
+  if(first){
+    if(frameCount % 5 == 0){
+      if(cnt < shkx.length){
+        shake.x = shkx[cnt];
+        shake.y = shky[cnt];
+      }
+      else{
+        cnt = -1;
+        shake.x = 0;
+        shake.y = 0;
+      }
+      wl11.add(shake.x*sx,shake.y*sy);
+      wl12.add(shake.x*sx,shake.y*sy);
+      wl21.add(shake.x*sx,shake.y*sy);
+      wl22.add(shake.x*sx,shake.y*sy);
+      figpos.add(shake.x*sx,shake.y*sy);
+      lightpos.add(shake.x*sx,shake.y*sy);
+      fill(255,0,0,filter*sy*2);
+      rect(400,400,800,800);
+      hlheight += shake.y*sy;
+      thrdltpos.add(shake.x*sx,shake.y*sy);
+      thrdfigpos.add(shake.x*sx,shake.y*sy);
+      selfpos.add(shake.x*sx,shake.y*sy);
+      //print(shake.x);
+      //print(shake.y);
+      cnt ++;
+      //print(cnt);
     }
-    else{
-      cnt = -1;
-      shake.x = 0;
-      shake.y = 0;
-    }
-    wl11.add(shake.x*sx,shake.y*sy);
-    wl12.add(shake.x*sx,shake.y*sy);
-    wl21.add(shake.x*sx,shake.y*sy);
-    wl22.add(shake.x*sx,shake.y*sy);
-    figpos.add(shake.x*sx,shake.y*sy);
-    lightpos.add(shake.x*sx,shake.y*sy);
-    fill(255,0,0,filter*sy*2);
+    fill(255,0,0,filter*sy);
     rect(400,400,800,800);
-    //print(shake.x);
-    //print(shake.y);
-    cnt ++;
-    //print(cnt);
   }
-  fill(255,0,0,filter*sy);
-  rect(400,400,800,800);
+  else{
+    if(frameCount % 5 == 0){
+      if(cnt < shkx.length){
+        shake.x = shkx[cnt];
+        shake.y = shky[cnt];
+      }
+      else{
+        cnt = -1;
+        shake.x = 0;
+        shake.y = 0;
+      }
+      wl11.add(shake.x*sx,shake.y*sy);
+      wl12.add(shake.x*sx,shake.y*sy);
+      wl21.add(shake.x*sx,shake.y*sy);
+      wl22.add(shake.x*sx,shake.y*sy);
+      figpos.add(shake.x*sx,shake.y*sy);
+      lightpos.add(shake.x*sx,shake.y*sy);
+      fill(255,0,0,filter*sy*2);
+      rect(0,0,800,800);
+      hlheight += shake.y*sy;
+      thrdltpos.add(shake.x*sx,shake.y*sy);
+      thrdfigpos.add(shake.x*sx,shake.y*sy);
+      selfpos.add(shake.x*sx,shake.y*sy);
+      //print(shake.x);
+      //print(shake.y);
+      cnt ++;
+      //print(cnt);
+    }
+    fill(255,0,0,filter*sy);
+    rect(0,0,800,800);
+  }
+}
+
+function thirdhall(){
+  hllength = sqrt(abs(pow(wl11.x, 2) + pow(wl11.y, 2)))/cos(44.5);
+  push();
+  //print(hllength)
+  translate(hllength, 400-hlheight/2);
+  fill(10 + countlights(onoff)*5);
+  rect(-hllength,0,hllength,126);
+  pop();
+}
+
+function thirdfigure(pos){
+  push();
+  translate(pos.x,pos.y);
+  fill(0);
+  ellipse(0,7,25,3); //hat
+  ellipse(0,2,12,3);
+  rect(-6,2,12,5);
+
+  ellipse(0,10,11,18); //head
+
+  beginShape(); //body
+  vertex(4, 18);
+  vertex(11, 33);
+  vertex(11, 46);
+  vertex(6, 66);
+  vertex(5, 96);
+  vertex(-4, 96);
+  vertex(-9, 59);
+  vertex(-8, 30);
+  vertex(-2, 24);
+  vertex(0, 18);
+  endShape();
+
+  if(frameCount%100 == 0){
+    if(blink == true){
+      figframe = frameCount;
+      blink = false;
+    }
+  }
+  if(frameCount - figframe <= 10){
+    fill(0);
+  }
+  else{
+    fill(255);
+    blink = true;
+  }
+  circle(-2.8,10,1.5); //eyes
+  pop();
+}
+
+function thirdself(pos){
+  push();
+  translate(pos.x, pos.y);
+  fill(50 + countlights(onoff)*5);
+  ellipse(0,-2,10,14); //head
+
+  beginShape(); //body
+  vertex(-3, 4);
+  vertex(-6, 15);
+  vertex(-6, 30);
+  vertex(-4, 36);
+  vertex(-2, 63);
+  vertex(5, 63);
+  vertex(7, 38);
+  vertex(7, 16);
+  vertex(4, 10);
+  vertex(1, 4);
+  endShape();
+
+  if(frameCount%120 == 0){
+    if(selfblink == true){
+      selfframe = frameCount;
+      selfblink = false;
+    }
+  }
+  if(frameCount - selfframe <= 10){
+    fill(50 + countlights(onoff)*5);
+  }
+  else{
+    fill(255);
+    selfblink = true;
+  }
+  circle(2,-2,1.5); //eyes
+  pop();
 }
 
 function draw(){
-  background(80);
-  figure(figpos.x,figpos.y,figsz);
-  wall(wl11,wl12,wl21,wl22);
-  ground(wl11,wl21,wl12,wl22);
+  if(first == true){ //first person
+    rectMode(CENTER);
+    background(0 + countlights(onoff)*5);
+    figure(figpos.x,figpos.y,figsz);
+    wall(wl11,wl12,wl21,wl22);
+    ground(wl11,wl21,wl12,wl22);
 
-  for(let i = 0; i < 4; i++){
-    lightlist[i].flicker();
+    for(let i = 0; i < 4; i++){
+      lightlist[i].flicker();
+    }
+
+    sanity(abs(wl11.x-wl21.x),abs(wl11.y-wl12.y));
+
+    if(fwd){
+      wl11.add(-move.x,-move.y);
+      wl12.add(-move.x,move.y);
+      wl21.add(move.x,-move.y);
+      wl22.add(move.x,move.y);
+      //print(abs(wl11.y-wl12.y)/abs(wl11.x-wl21.x));
+      figsz = abs(wl11.x-wl21.x)/50;
+      if(abs(wl11.x-wl21.x) > 55){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else if(abs(wl11.x-wl21.x) > 35){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed*2;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else{
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed*3;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      walk(2);
+    }
+    else if(bwd && abs(wl11.x-wl21.x) >= 15){
+      wl11.add(move.x,move.y);
+      wl12.add(move.x,-move.y);
+      wl21.add(-move.x,move.y);
+      wl22.add(-move.x,-move.y);
+      //print(abs(wl11.y-wl12.y)/abs(wl11.x-wl21.x));
+      //print(abs(wl11.x-wl21.x));
+      figsz = abs(wl11.x-wl21.x)/50;
+      if(abs(wl11.x-wl21.x) > 55){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else if(abs(wl11.x-wl21.x) > 35){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed*2;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else{
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed*3;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      walk(2);
+    }
   }
+  else if(first == false){ //third person
+    rectMode(CORNER);
+    background(0);
+    thirdhall();
+    //print(hllength);
+    //print(hlheight);
+    thrdltpos = createVector(hllength, 400-hlheight/2);
+    thrdfigpos = createVector(hllength-18,400-hlheight/2+30);
+    selfpos.y = 800-(337+hlheight/2);
+    thirdself(selfpos);
 
-  sanity(abs(wl11.x-wl21.x),abs(wl11.y-wl12.y));
+    for(let i = 0; i < 4; i++){
+      lightlist[i].fadingnoshow();
+      thrdlist[i].update(thrdltpos);
+      thrdlist[i].flicker();
+    }
 
-  if(fwd){
-    wl11.add(-move.x,-move.y);
-    wl12.add(-move.x,move.y);
-    wl21.add(move.x,-move.y);
-    wl22.add(move.x,move.y);
-    //print(abs(wl11.y-wl12.y)/abs(wl11.x-wl21.x));
-    figsz = abs(wl11.x-wl21.x)/50;
-    if(abs(wl11.x-wl21.x) > 55){
-      for(let i = 0; i < 4; i++){
-        lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed;
-        lightlist[i].update(lightdist[i]);
+    thirdfigure(thrdfigpos);
+
+    sanity(abs(wl11.x-wl21.x),abs(wl11.y-wl12.y));
+
+    if(fwd){
+      wl11.add(-move.x,-move.y);
+      wl12.add(-move.x,move.y);
+      wl21.add(move.x,-move.y);
+      wl22.add(move.x,move.y);
+      //print(abs(wl11.y-wl12.y)/abs(wl11.x-wl21.x));
+      figsz = abs(wl11.x-wl21.x)/50;
+      if(abs(wl11.x-wl21.x) > 55){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else if(abs(wl11.x-wl21.x) > 35){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed*2;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else{
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed*3;
+          lightlist[i].update(lightdist[i]);
+        }
       }
     }
-    else if(abs(wl11.x-wl21.x) > 35){
-      for(let i = 0; i < 4; i++){
-        lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed*2;
-        lightlist[i].update(lightdist[i]);
+    else if(bwd && abs(wl11.x-wl21.x) >= 15){
+      wl11.add(move.x,move.y);
+      wl12.add(move.x,-move.y);
+      wl21.add(-move.x,move.y);
+      wl22.add(-move.x,-move.y);
+      //print(abs(wl11.y-wl12.y)/abs(wl11.x-wl21.x));
+      //print(abs(wl11.x-wl21.x));
+      figsz = abs(wl11.x-wl21.x)/50;
+      if(abs(wl11.x-wl21.x) > 55){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else if(abs(wl11.x-wl21.x) > 35){
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed*2;
+          lightlist[i].update(lightdist[i]);
+        }
+      }
+      else{
+        for(let i = 0; i < 4; i++){
+          lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed*3;
+          lightlist[i].update(lightdist[i]);
+        }
       }
     }
-    else{
-      for(let i = 0; i < 4; i++){
-        lightdist[i] = lightdist[i] + (figpos.y - wl11.y)*lightmove[i]*lightspeed*3;
-        lightlist[i].update(lightdist[i]);
-      }
-    }
-    
-    walk(2);
-  }
-  else if(bwd && abs(wl11.x-wl21.x) >= 15){
-    wl11.add(move.x,move.y);
-    wl12.add(move.x,-move.y);
-    wl21.add(-move.x,move.y);
-    wl22.add(-move.x,-move.y);
-    //print(abs(wl11.y-wl12.y)/abs(wl11.x-wl21.x));
-    //print(abs(wl11.x-wl21.x));
-    figsz = abs(wl11.x-wl21.x)/50;
-    if(abs(wl11.x-wl21.x) > 55){
-      for(let i = 0; i < 4; i++){
-        lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed;
-        lightlist[i].update(lightdist[i]);
-      }
-    }
-    else if(abs(wl11.x-wl21.x) > 35){
-      for(let i = 0; i < 4; i++){
-        lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed*2;
-        lightlist[i].update(lightdist[i]);
-      }
-    }
-    else{
-      for(let i = 0; i < 4; i++){
-        lightdist[i] = lightdist[i] - (figpos.y - wl11.y)*lightmove[i]*lightspeed*3;
-        lightlist[i].update(lightdist[i]);
-      }
-    }
-    walk(2);
   }
 }
